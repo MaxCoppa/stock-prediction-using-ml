@@ -1,5 +1,12 @@
 """
-A Random Forest (RF) model is chosen for the Benchmark. We consider a large number of tree with a quiet small depth. The missing values are simply filled with 0. A KFold is done on the dates (using `DATE`) for a local scoring of the model.
+model_selection.py
+
+Model selection utility using K-Fold cross-validation.
+
+- A Random Forest (or another tree-based model) can be used as a benchmark.
+- Missing values are filled with 0.
+- KFold is applied on unique identifiers (e.g., IDs, dates) to ensure
+  splits are consistent with grouped data.
 """
 
 import pandas as pd
@@ -12,65 +19,67 @@ from .evaluate import evaluate_model
 
 
 def model_selection_using_kfold(
-    train,
-    target,
-    features,
-    model_type,
+    train: pd.DataFrame,
+    target: str,
+    features: list[str],
+    model_type: str,
     unique_id: str = "ID",
     plot_ft_importance: bool = False,
 ):
+    """
+    Perform K-Fold cross-validation for model selection.
 
+    Parameters
+    ----------
+    train : pd.DataFrame
+        Training dataset.
+    target : str
+        Target column name.
+    features : list of str
+        Feature column names.
+    model_type : str
+        One of {"rf", "xgb", "lgbm", "cat"}.
+    unique_id : str, default="ID"
+        Column used to split folds (e.g., IDs, dates).
+    plot_ft_importance : bool, default=False
+        If True, plots average feature importance across folds.
+    """
     X_train = train[features]
     y_train = train[target]
-
     unique_ids = train[unique_id].unique()
 
-    n_splits = 4  # Split Kfold
+    n_splits = 4
+    metrics = {"accuracy": [], "auc": [], "f1": []}
+    models = []
 
-    metrics = {  # Store all metrics
-        "accuracy": [],
-        "auc": [],
-        "f1": [],
-    }
-    scores = []  # List for scores
-    models = []  # Keep the different models
-
+    # Define KFold splits on unique identifiers
     splits = KFold(n_splits=n_splits, random_state=0, shuffle=True).split(unique_ids)
 
-    for i, (local_unique_ids_ids, local_test_dates_ids) in enumerate(splits):
-
+    for i, (train_idx, test_idx) in enumerate(splits):
+        # Extract fold-specific training and test data
         X_local_train, y_local_train, _ = get_data(
-            local_unique_ids_ids, unique_ids, train[unique_id], X_train, y_train
+            train_idx, unique_ids, train[unique_id], X_train, y_train
         )
         X_local_test, y_local_test, local_test_ids = get_data(
-            local_test_dates_ids, unique_ids, train[unique_id], X_train, y_train
+            test_idx, unique_ids, train[unique_id], X_train, y_train
         )
 
-        X_local_train = X_local_train.fillna(0)  # Fill missing values with 0
-        X_local_test = X_local_test.fillna(0)  # Fill missing values with 0
+        # Initialize and fit model
+        model = get_model(model_type)
+        model.fit(X_local_train, y_local_train)
 
-        model = get_model(model_type)  # model definition
+        # Evaluate on local test split
+        model_eval = evaluate_model(model=model, X=X_local_test, y=y_local_test)
 
-        model.fit(
-            X_local_train, y_local_train
-        )  # Fit the model using the X,y definied above
+        models.append(model)
 
-        model_eval_k = evaluate_model(
-            model=model,
-            X=X_local_test,
-            y=y_local_test,
+        # Collect metrics
+        acc, roc_auc, f1 = (
+            model_eval["accuracy"],
+            model_eval["roc_auc"],
+            model_eval["f1"],
         )
-
-        models.append(
-            model
-        )  # Here on fit several models to test the pertinence of random forest
-
-        # Compute metrics
-        acc = model_eval_k["accuracy"]
-        roc_auc = model_eval_k["roc_auc"]
-        f1 = model_eval_k["f1"]
-
-        metrics["accuracy"].append(model_eval_k["accuracy"])
+        metrics["accuracy"].append(acc)
         metrics["auc"].append(roc_auc)
         metrics["f1"].append(f1)
 
@@ -79,33 +88,34 @@ def model_selection_using_kfold(
             f"AUC: {roc_auc:.3f} | F1: {f1:.3f}"
         )
 
-    # Aggregate results
+    # Aggregate cross-validation results
     for m in metrics:
         mean = np.mean(metrics[m]) * (100 if m == "accuracy" else 1)
         std = np.std(metrics[m]) * (100 if m == "accuracy" else 1)
-        u = mean + std
-        l = mean - std
+        l, u = mean - std, mean + std
         unit = "%" if m == "accuracy" else ""
         print(
-            f"{m.capitalize()}: {mean:.2f}{unit} [{l:.2f}{unit} ; {u:.2f}{unit}] (+- {std:.2f}{unit})"
+            f"{m.capitalize()}: {mean:.2f}{unit} [{l:.2f}{unit} ; {u:.2f}{unit}] "
+            f"(± {std:.2f}{unit})"
         )
 
     if plot_ft_importance:
         plot_feature_importance(models, features)
 
 
-def get_data(
-    ids, dates_unique, dates_col: pd.Series, X_data: pd.DataFrame, y_data: pd.Series
-):
-
-    local_dates = dates_unique[ids]
-    local_ids = dates_col.isin(local_dates)
-
-    return X_data.loc[local_ids], y_data.loc[local_ids], local_ids
+def get_data(ids, unique_vals, col: pd.Series, X_data: pd.DataFrame, y_data: pd.Series):
+    """
+    Extract subset of X and y given selected indices of unique values.
+    """
+    selected = unique_vals[ids]
+    mask = col.isin(selected)
+    return X_data.loc[mask], y_data.loc[mask], mask
 
 
 def plot_feature_importance(models, features):
-
+    """
+    Plot mean feature importance across trained models.
+    """
     feature_importances = pd.DataFrame(
         [model.feature_importances_ for model in models], columns=features
     )
@@ -115,5 +125,4 @@ def plot_feature_importance(models, features):
         orient="h",
         order=feature_importances.mean().sort_values(ascending=False).index,
     )
-
     return True

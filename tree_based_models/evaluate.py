@@ -1,8 +1,15 @@
+"""
+Evaluation utilities for single models and ensembles.
+"""
+
 from sklearn.metrics import f1_score, roc_auc_score, accuracy_score
 from .ensemble import predict_ensembler_models
 
 
-def evaluate_model(model, X, y, threshold: float = 0.5, verbose=False) -> dict:
+def evaluate_model(model, X, y, threshold: float = 0.5, verbose: bool = False) -> dict:
+    """
+    Evaluate a single model on given data.
+    """
     proba = model.predict_proba(X)[:, 1]
     preds = (proba > threshold).astype(int)
 
@@ -22,11 +29,16 @@ def evaluate_model(model, X, y, threshold: float = 0.5, verbose=False) -> dict:
 
 
 def evaluate_ensemble_model(
-    models, X, y, threshold: float = 0.5, verbose=False
+    models, X, y, threshold: float = 0.5, verbose: bool = False
 ) -> dict:
+    """
+    Evaluate an ensemble of models using averaged predictions.
+
+    """
     avg_proba, avg_preds = predict_ensembler_models(
         models=models, X=X, threshold=threshold
     )
+
     results = {
         "f1": f1_score(y, avg_preds),
         "roc_auc": roc_auc_score(y, avg_proba),
