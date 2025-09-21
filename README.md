@@ -51,7 +51,7 @@ supporting transparent experimentation and reproducibility.
 
 ## Project Structure
 
-
+```text
 ├── README.md                   # Project documentation
 ├── requirements.txt             # Dependencies
 ├── feature_enginneering/        # Feature engineering utilities
@@ -59,7 +59,7 @@ supporting transparent experimentation and reproducibility.
 ├── model_comparaison.py         # Notebook script: single model training & evaluation
 ├── ensemble_comparaison.py      # Notebook script: ensemble training & evaluation
 └── data_visualisation.ipynb     # Exploratory data analysis and visualization
-
+```
 ---
 
 ## Usage
