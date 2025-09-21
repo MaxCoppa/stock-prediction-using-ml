@@ -41,8 +41,8 @@ test = pd.read_csv("data/test.csv")
 train.head()
 
 # %% --- Define features and target ---
-features = [f"var{i}" for i in range(1, 11) if i not in [5]]
-target = "TARGET"
+features = [f"var{i}" for i in range(1, 11)]  # Example features
+target = "TARGET"  # Example target
 
 
 # %% --- Feature engineering ---
