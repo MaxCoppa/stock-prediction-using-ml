@@ -1,0 +1,14 @@
+.DS_Store
+
+# Python compiled files
+__pycache__/
+*.pyc
+
+# Ignore all CSV files
+*.csv
+
+.ipynb_checkpoints/
+data/
+
+catboost_info/
+config_features.py
