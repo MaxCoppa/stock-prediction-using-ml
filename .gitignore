@@ -9,3 +9,6 @@ __pycache__/
 
 .ipynb_checkpoints/
 data/
+
+catboost_info/
+config_features.py
